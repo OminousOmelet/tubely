@@ -1,7 +1,8 @@
 package main
 
 import (
-	//"encoding/base64"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,12 +46,9 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	fileType := formHeader.Header.Get("Content-type")
-
-	// data, err := io.ReadAll(formFile)
-	// if err != nil {
-	// 	respondWithError(w, 500, "error reading from file", err)
-	// 	return
-	// }
+	if fileType != "image/jpeg" && fileType != "image/png" {
+		respondWithError(w, 500, "thumbnail file type must be jpeg or png", err)
+	}
 
 	mData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -62,12 +60,12 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// creates random name for thumbnail file name with every function call
+	c := make([]byte, 32)
+	rand.Read(c)
+	cryptStr := base64.RawURLEncoding
 	extension := strings.Split(fileType, "/")[1]
-	path := filepath.Join(cfg.assetsRoot, videoIDString+"."+extension)
-
-	//dataB64 := base64.StdEncoding.EncodeToString(data)
-	//dataURL := fmt.Sprintf("data:%v;base64,%v", fileType, dataB64)
-
+	path := filepath.Join(cfg.assetsRoot, cryptStr.EncodeToString(c)+"."+extension)
 	f, err := os.Create(path)
 	if err != nil {
 		respondWithError(w, 500, "error creating thumbnail file", err)
