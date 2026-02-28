@@ -47,7 +47,9 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 	fileType := formHeader.Header.Get("Content-type")
 	if fileType != "image/jpeg" && fileType != "image/png" {
+		err = fmt.Errorf("bad file type")
 		respondWithError(w, 500, "thumbnail file type must be jpeg or png", err)
+		return
 	}
 
 	mData, err := cfg.db.GetVideo(videoID)
@@ -63,12 +65,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	// creates random name for thumbnail file name with every function call
 	c := make([]byte, 32)
 	rand.Read(c)
-	cryptStr := base64.RawURLEncoding
+	b64 := base64.RawURLEncoding
 	extension := strings.Split(fileType, "/")[1]
-	path := filepath.Join(cfg.assetsRoot, cryptStr.EncodeToString(c)+"."+extension)
+	path := filepath.Join(cfg.assetsRoot, b64.EncodeToString(c)+"."+extension)
 	f, err := os.Create(path)
 	if err != nil {
 		respondWithError(w, 500, "error creating thumbnail file", err)
+		return
 	}
 	defer f.Close()
 	io.Copy(f, formFile)
@@ -83,8 +86,5 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fmt.Println(fileType)
-	fmt.Println(path)
-	fmt.Println(tnURL)
 	respondWithJSON(w, http.StatusOK, mData)
 }
