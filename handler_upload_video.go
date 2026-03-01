@@ -67,7 +67,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tmp, err := os.CreateTemp("", "tubely-upload.mp4")
+	tmp, err := os.CreateTemp("/tmp", "tubely-upload.mp4")
 	if err != nil {
 		respondWithError(w, 500, "Error creating temp file", err)
 		return
@@ -86,9 +86,27 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	tmp.Seek(0, io.SeekStart)
 
 	c := make([]byte, 32)
-	rand.Read(c)
-	b64 := base64.RawURLEncoding
-	keyStr := b64.EncodeToString(c) + ".mp4"
+	_, err = rand.Read(c)
+	if err != nil {
+		respondWithError(w, 500, "error generating random bytes", err)
+		return
+	}
+	keyStr := base64.RawURLEncoding.EncodeToString(c) + ".mp4"
+
+	aspect, err := getVideoAspectRatio(tmp.Name())
+	if err != nil {
+		respondWithError(w, 500, "error getting video aspect", err)
+	}
+	var aspPrefix string
+	switch aspect {
+	case "16:9":
+		aspPrefix = "landscape"
+	case "9:16":
+		aspPrefix = "portrait"
+	default:
+		aspPrefix = "other"
+	}
+	keyStr = aspPrefix + "/" + keyStr
 
 	// ?? (first return value would just be a pointer)
 	_, err = cfg.s3client.PutObject(context.Background(), &s3.PutObjectInput{
