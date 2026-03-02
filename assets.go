@@ -15,7 +15,7 @@ func (cfg apiConfig) ensureAssetsDir() error {
 	return nil
 }
 
-func generateAssetPath(mediaType string) string {
+func generateAssetName(mediaType string) string {
 	base := make([]byte, 32)
 	_, err := rand.Read(base)
 	if err != nil {
@@ -33,4 +33,8 @@ func mediaTypeToExt(mediaType string) string {
 		return ".bin"
 	}
 	return "." + parts[1]
+}
+
+func (cfg apiConfig) getObjectURL(key string) string {
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
 }

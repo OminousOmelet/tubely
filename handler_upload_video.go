@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -82,37 +80,40 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	fmt.Printf("Copying video file (%d bytes) to %s", bytesCopied, tmp.Name())
-
 	tmp.Seek(0, io.SeekStart)
-
-	c := make([]byte, 32)
-	_, err = rand.Read(c)
-	if err != nil {
-		respondWithError(w, 500, "error generating random bytes", err)
-		return
-	}
-	keyStr := base64.RawURLEncoding.EncodeToString(c) + ".mp4"
 
 	aspect, err := getVideoAspectRatio(tmp.Name())
 	if err != nil {
 		respondWithError(w, 500, "error getting video aspect", err)
+		return
 	}
-	var aspPrefix string
-	switch aspect {
-	case "16:9":
-		aspPrefix = "landscape"
-	case "9:16":
-		aspPrefix = "portrait"
-	default:
-		aspPrefix = "other"
+	keyStr := aspect + "/" + generateAssetName(mediaType)
+
+	procStr, err := processVideoForFastStart(tmp.Name())
+	if err != nil {
+		fmt.Printf("\n%s", err)
+		respondWithError(w, 500, "error processing video for fast start", err)
+		return
 	}
-	keyStr = aspPrefix + "/" + keyStr
+	procFile, err := os.Open(procStr)
+	if err != nil {
+		fmt.Printf("\n%s", err)
+		respondWithError(w, 500, "error opening processed file", err)
+		return
+	}
+
+	fmt.Printf("Created fast-start version of video at %s\n", procStr)
+	defer os.Remove(procFile.Name())
+	defer procFile.Close()
+
+	// fmt.Println("\nEarly exit (debugging)")
+	// return
 
 	// ?? (first return value would just be a pointer)
 	_, err = cfg.s3client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &keyStr,
-		Body:        tmp,
+		Body:        procFile,
 		ContentType: &mediaType,
 	})
 	if err != nil {
@@ -121,7 +122,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ff := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, keyStr)
+	ff := cfg.getObjectURL(keyStr)
 	mData.VideoURL = &ff
 	err = cfg.db.UpdateVideo(mData)
 	if err != nil {

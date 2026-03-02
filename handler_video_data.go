@@ -35,9 +35,9 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	var ratioStr string
 	ratio := asp.Streams[0].Width / asp.Streams[0].Height
 	if ratio > 1.76 && ratio < 1.79 {
-		ratioStr = "16:9"
+		ratioStr = "landscape"
 	} else if ratio > 0.54 && ratio < 0.57 {
-		ratioStr = "9:16"
+		ratioStr = "portrait"
 	} else {
 		ratioStr = "other"
 	}
@@ -45,4 +45,11 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	fmt.Printf("\nvideo width: %f, video height: %f", asp.Streams[0].Width, asp.Streams[0].Height)
 	fmt.Printf("\nVideo aspect measured: %s\n", ratioStr)
 	return ratioStr, nil
+}
+
+func processVideoForFastStart(filePath string) (string, error) {
+	output := filePath + ".processing"
+	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", output)
+	cmd.Run()
+	return output, nil
 }
