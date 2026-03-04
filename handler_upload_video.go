@@ -36,12 +36,12 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	mData, err := cfg.db.GetVideo(videoID)
+	vData, err := cfg.db.GetVideo(videoID)
 	if err != nil {
 		respondWithError(w, 500, "error getting video from id", err)
 		return
 	}
-	if mData.UserID != userID {
+	if vData.UserID != userID {
 		respondWithError(w, http.StatusUnauthorized, "Unauthorized", err)
 		return
 	}
@@ -106,9 +106,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	defer os.Remove(procFile.Name())
 	defer procFile.Close()
 
-	// fmt.Println("\nEarly exit (debugging)")
-	// return
-
 	// ?? (first return value would just be a pointer)
 	_, err = cfg.s3client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
@@ -122,13 +119,23 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ff := cfg.getObjectURL(keyStr)
-	mData.VideoURL = &ff
-	err = cfg.db.UpdateVideo(mData)
+	//ff := cfg.getObjectURL(keyStr)
+
+	// combined bucket and key string for presigned URL
+	buckAndKey := cfg.s3Bucket + "," + keyStr
+	vData.VideoURL = &buckAndKey
+	vData, err = cfg.dbVideoToSignedVideo(vData)
+	if err != nil {
+		fmt.Printf("\nPresign error: %s", err)
+		respondWithError(w, 500, "failed to get presigned URL", err)
+		return
+	}
+
+	err = cfg.db.UpdateVideo(vData)
 	if err != nil {
 		respondWithError(w, 500, "error updating video data", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, mData)
+	respondWithJSON(w, http.StatusOK, vData)
 }
