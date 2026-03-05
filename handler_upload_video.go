@@ -119,17 +119,8 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	//ff := cfg.getObjectURL(keyStr)
-
-	// combined bucket and key string for presigned URL
-	buckAndKey := cfg.s3Bucket + "," + keyStr
-	vData.VideoURL = &buckAndKey
-	vData, err = cfg.dbVideoToSignedVideo(vData)
-	if err != nil {
-		fmt.Printf("\nPresign error: %s", err)
-		respondWithError(w, 500, "failed to get presigned URL", err)
-		return
-	}
+	url := cfg.s3CfDistribution + "/" + keyStr
+	vData.VideoURL = &url
 
 	err = cfg.db.UpdateVideo(vData)
 	if err != nil {
